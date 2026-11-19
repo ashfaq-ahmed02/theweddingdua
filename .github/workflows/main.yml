@@ -1,0 +1,53 @@
+name: main.yml
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  ci:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check index.html exists
+        run: |
+          test -f index.html || (echo "index.html is missing" && exit 1)
+          echo "index.html found"
+      - name: Basic HTML sanity check
+        run: |
+          grep -q "<!DOCTYPE html>" index.html
+          grep -q "</html>" index.html
+
+  build:
+    needs: ci
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/configure-pages@v5
+      - name: Collect site files
+        run: |
+          mkdir site
+          cp index.html site/
+          [ -d assets ] && cp -r assets site/ || true
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: site
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4
